@@ -53,16 +53,9 @@ __FBSDID("$FreeBSD$");
 static bool
 __kernel_supports_unionfs(void)
 {
-	static int8_t kernel_supports_unionfs = -1;
-	if (kernel_supports_unionfs == -1) {
-		int value = 0;
-		size_t len = sizeof(value);
-		sysctlbyname("kern.secure_kernel", &value, &len, NULL, 0);
-		/* Linux does not implement Darwin unionfs or kern.secure_kernel sysctl.
-		 * Disable unionfs support to prevent futile and broken traversal. */
-		kernel_supports_unionfs = 0;
-	}
-	return kernel_supports_unionfs;
+	/* Linux does not implement Darwin unionfs.
+	 * Disable unionfs support to prevent futile traversal and polluting errno. */
+	return false;
 }
 
 static int
@@ -86,7 +79,6 @@ static DIR * __opendir_common(int, int, bool);
 DIR *
 opendir(const char *name)
 {
-
 	return (__opendir2(name, DTF_HIDEW|DTF_NODUP));
 }
 
@@ -116,7 +108,7 @@ __opendir2(const char *name, int flags)
 {
 	int fd;
 	DIR *dir;
-	int saved_errno;
+	int saved_errno = errno;
 
 	if ((flags & (__DTF_READALL | __DTF_SKIPREAD)) != 0)
 		return (NULL);
@@ -128,6 +120,8 @@ __opendir2(const char *name, int flags)
 	if (dir == NULL) {
 		saved_errno = errno;
 		_close(fd);
+		errno = saved_errno;
+	} else {
 		errno = saved_errno;
 	}
 	return (dir);
@@ -330,7 +324,7 @@ static DIR *
 __opendir_common(int fd, int flags, bool use_current_pos)
 {
 	DIR *dirp;
-	int saved_errno;
+	int saved_errno = errno;
 	int unionstack;
 
 	if ((dirp = malloc(sizeof(DIR) + sizeof(struct _telldir))) == NULL)
@@ -419,6 +413,7 @@ __opendir_common(int fd, int flags, bool use_current_pos)
 		}
 	}
 
+	errno = saved_errno;
 	return (dirp);
 
 fail:
