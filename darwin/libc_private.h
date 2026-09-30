@@ -36,6 +36,9 @@ struct _libc_functions {
 	void (*atfork_parent)(void); // version 1
 	void (*atfork_child)(void); // version 1
 	char *(*dirhelper)(int, char *, size_t); // version 1
+#ifdef DARLING
+	void (*atfork_failed)(void); // version 2: unwind without waiting for a child
+#endif
 };
 
 struct ProgramVars; // forward reference
