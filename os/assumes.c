@@ -67,6 +67,7 @@ typedef struct dl_info {
 static const char *
 _os_basename(const char *p)
 {
+	if (!p) return "unknown";
 	return ((strrchr(p, '/') ? : p - 1) + 1);
 }
 #endif
@@ -99,11 +100,12 @@ _os_get_build(char *build, size_t sz)
 static void
 _os_get_image_uuid(void *hdr, uuid_t uuid)
 {
-#if __LP64__
-	struct mach_header_64 *hdr32or64 = (struct mach_header_64 *)hdr;
-#else
 	struct mach_header *hdr32or64 = (struct mach_header *)hdr;
-#endif /* __LP64__ */
+	if (!hdr32or64 || (hdr32or64->magic != 0xfeedfacf && hdr32or64->magic != 0xfeedface && 
+					   hdr32or64->magic != 0xcffaedfe && hdr32or64->magic != 0xcefaedfe)) {
+		uuid_clear(uuid);
+		return;
+	}
 
 	size_t i = 0;
 	size_t next = sizeof(*hdr32or64);
@@ -152,48 +154,26 @@ typedef struct mach_header os_mach_header;
 static os_redirect_t
 _os_find_log_redirect_func(os_mach_header *hdr)
 {
-	os_redirect_t result = NULL;
-
-#if !TARGET_OS_DRIVERKIT
-	char name[128];
-	unsigned long size = 0;
-	uint8_t *data = getsectiondata(hdr, OS_ASSUMES_REDIRECT_SEG, OS_ASSUMES_REDIRECT_SECT, &size);
-	if (!data) {
-		data = getsectiondata(hdr, "__TEXT", OSX_ASSUMES_LOG_REDIRECT_SECT_NAME, &size);
-
-		if (data && size < sizeof(name) - 2) {
-			(void)strlcpy(name, (const char *)data, size + 1);
-			result = dlsym(RTLD_DEFAULT, name);
-		}
-	} else if (size == sizeof(struct _os_redirect_assumes_s)) {
-		struct _os_redirect_assumes_s *redirect = (struct _os_redirect_assumes_s *)data;
-		result = redirect->redirect;
-	}
-#endif
-
-	return result;
+	// Darling: Disable custom log redirect execution.
+	// Due to Darling's dyld not rebasing the OS_ASSUMES_REDIRECT_SEG custom section 
+	// for PIE executables like launchd, redirect_func points to an un-slid address,
+	// causing a SEGV_ACCERR when called.
+	return NULL;
 }
 
 static bool
 _os_log_redirect(void *hdr, const char *msg)
 {
-	bool result = false;
-
-	os_redirect_t redirect_func = _os_find_log_redirect_func(hdr);
-	if (redirect_func) {
-		result = redirect_func(msg);
-	}
-
-	return result;
+	return false;
 }
 
 __attribute__((always_inline))
 static void
 _os_construct_message(uint64_t code, _SIMPLE_STRING asl_message, Dl_info *info, char *buff, size_t sz)
 {
-	const char *image_name = NULL;
+	const char *image_name = "unknown";
 	uintptr_t offset = 0;
-	uuid_string_t uuid_str;
+	uuid_string_t uuid_str = {0};
 
 #if !TARGET_OS_DRIVERKIT
 	void *ret = __builtin_return_address(0);
