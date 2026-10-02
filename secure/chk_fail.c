@@ -43,6 +43,9 @@
 #include <mach-o/dyld.h>
 #include <mach-o/dyld_priv.h>
 #if TARGET_OS_OSX
+#ifndef dyld_platform_version_macOS_10_9
+#define dyld_platform_version_macOS_10_9 ((dyld_build_version_t){1, 0x000A0900})
+#endif
 #define START_VERSION dyld_platform_version_macOS_10_9
 #else
 #error "This platform should not build with PR_13085474_CHECK=1"
