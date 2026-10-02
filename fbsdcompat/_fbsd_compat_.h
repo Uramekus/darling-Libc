@@ -181,4 +181,11 @@
 #define	_GENERIC_DIRSIZ(dp) \
     (((unsigned long)&((struct dirent *)0)->d_name + (dp)->d_namlen+1 + 3) & ~3)
 
+#ifndef TRUE
+#define TRUE 1
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
+
 #endif /* __FBSD_COMPAT__H_ */
